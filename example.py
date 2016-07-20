@@ -61,8 +61,9 @@ COORDS_LONGITUDE = 0
 COORDS_ALTITUDE = 0
 FLOAT_LAT = 0
 FLOAT_LONG = 0
-NEXT_LAT = 0
-NEXT_LONG = 0
+OLD_LOC=''
+NEW_LOC=''
+LOCATION_CHANGED=False
 auto_refresh = 0
 default_step = 0.001
 api_endpoint = None
@@ -598,6 +599,10 @@ def main():
     dy = -1
     steplimit2 = steplimit**2
     for step in range(steplimit2):
+        global LOCATION_CHANGED
+        if LOCATION_CHANGED:
+            LOCATION_CHANGED=False
+            break
         #starting at 0 index
         debug('looping: step {} of {}'.format((step+1), steplimit**2))
         #debug('steplimit: {} x: {} y: {} pos: {} dx: {} dy {}'.format(steplimit2, x, y, pos, dx, dy))
@@ -615,15 +620,12 @@ def main():
         print('Completed: ' + str(
             ((step+1) + pos * .25 - .25) / (steplimit2) * 100) + '%')
 
-    global NEXT_LAT, NEXT_LONG
-    if (NEXT_LAT and NEXT_LONG and
-            (NEXT_LAT != FLOAT_LAT or NEXT_LONG != FLOAT_LONG)):
-        print('Update to next location %f, %f' % (NEXT_LAT, NEXT_LONG))
-        set_location_coords(NEXT_LAT, NEXT_LONG, 0)
-        NEXT_LAT = 0
-        NEXT_LONG = 0
-    else:
-        set_location_coords(origin_lat, origin_lon, 0)
+#    global OLD_LOC, NEW_LOC
+#    if :
+#        print('Update to next location %s' % (NEXT_LAT))
+#        set_location(NEXT_LAT)
+#    else:
+    set_location_coords(origin_lat, origin_lon, 0)
 
     register_background_thread()
 
@@ -658,6 +660,7 @@ def process_step(args, api_endpoint, access_token, profile_response,
                     if hash not in seen.keys() or (seen[hash].TimeTillHiddenMs <= wild.TimeTillHiddenMs):
                         visible.append(wild)    
                     seen[hash] = wild.TimeTillHiddenMs
+
                 if cell.Fort:
                     for Fort in cell.Fort:
                         if Fort.Enabled == True:
@@ -792,19 +795,21 @@ def fullmap():
         'example_fullmap.html', key=GOOGLEMAPS_KEY, fullmap=get_map(), auto_refresh=auto_refresh)
 
 
-@app.route('/next_loc')
+@app.route('/change_loc')
 def next_loc():
-    global NEXT_LAT, NEXT_LONG
+    global OLD_LOC, LOCATION_CHANGED
 
-    lat = flask.request.args.get('lat', '')
-    lon = flask.request.args.get('lon', '')
-    if not (lat and lon):
-        print('[-] Invalid next location: %s,%s' % (lat, lon))
+    l = flask.request.args.get('l', '')
+    if not (l):
+        print('[-] Invalid next location: %s' % (l))
     else:
-        print('[+] Saved next location as %s,%s' % (lat, lon))
-        NEXT_LAT = float(lat)
-        NEXT_LONG = float(lon)
-        return 'ok'
+        if OLD_LOC != l:
+            print('[+] Saved next location as %s' % (l))
+            OLD_LOC=l
+            LOCATION_CHANGED=True
+
+            set_location(l)
+        return fullmap()
 
 
 def get_pokemarkers():
